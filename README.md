@@ -3,6 +3,7 @@
 > 一套"**文档教程为主线 + 可运行 Demo 为辅助 + 真实服务器跑通为终点**"的 CI/CD 学习体系。
 > 主推平台：**Jenkins**（GitHub Actions / GitLab CI 全程横向对照）。
 > 部署形态：**单机实战**（Docker + Docker Compose + Nginx + HTTPS），部署目标是一台真实的腾讯云 CVM（`yengxun-yun`，Ubuntu 26.04 实测）。
+> 仓库：`git@github.com:yuxmgit/cicd-tutorial.git`（分支保护建议见第 02 章，Webhook 配置见第 05 章）。
 
 ## 一、为什么学这个？
 
