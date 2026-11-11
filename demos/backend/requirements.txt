@@ -1,0 +1,9 @@
+# 生产依赖 + 测试依赖（锁版本，保证 CI 与本地一致）
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+
+# 测试与覆盖率（第 08 章流水线要用）
+pytest==8.3.4
+httpx==0.28.1
+pytest-cov==6.0.0

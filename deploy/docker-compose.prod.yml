@@ -1,0 +1,59 @@
+# 生产编排：由 deploy.sh 复制到 releases/<版本>/docker-compose.yml 后执行
+# 关键设计：
+#   1. 后端端口只绑 127.0.0.1，公网只能经过 Nginx 访问
+#   2. 前端容器内的 Nginx 负责静态资源 + 把 /api 反代给 api 服务
+#   3. 日志轮转写在服务级别，双保险
+#   4. stop_grace_period 大于应用优雅退出时间，避免发布时硬切请求
+name: cicd-demo
+
+services:
+  api:
+    image: ${REGISTRY:?}/${NAMESPACE:?}/cicd-demo-backend:${IMAGE_TAG:?}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      SQLITE_PATH: /data/app.db
+      APP_VERSION: ${IMAGE_TAG}
+      LOG_LEVEL: info
+    volumes:
+      - ${APP_BASE_DIR:-/opt/apps/cicd-demo}/shared/data:/data
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2).status==200 else 1)"
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  web:
+    image: ${REGISTRY:?}/${NAMESPACE:?}/cicd-demo-frontend:${IMAGE_TAG:?}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # 生产 Nginx 配置由运维放在 shared/nginx/，第 13 章详解
+      - ${APP_BASE_DIR:-/opt/apps/cicd-demo}/shared/nginx/site.conf:/etc/nginx/conf.d/default.conf:ro
+      # 证书目录只读挂载（自签或 Let's Encrypt）
+      - ${APP_BASE_DIR:-/opt/apps/cicd-demo}/shared/certs:/etc/nginx/certs:ro
+    depends_on:
+      - api
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3

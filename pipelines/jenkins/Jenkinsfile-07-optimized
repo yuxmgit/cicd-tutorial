@@ -1,0 +1,72 @@
+// 优化版：并行 + 缓存 + changeset 裁剪 + quietPeriod 防抖（详见第 16 章）
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+        timeout(time: 15, unit: 'MINUTES')          // 收紧到 15 分钟，超时即失败
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+        disableConcurrentBuilds(abortPrevious: true) // 新提交来了，取消旧的构建
+        quietPeriod(5)                               // 5 秒防抖：连续 push 只构建最后一次
+    }
+
+    environment {
+        DEPLOY_SSH   = 'yengxun-yun'
+        GIT_SHA      = sh(returnStdout: true, script: 'git rev-parse --short=7 HEAD').trim()
+        IMAGE_TAG    = "${env.BUILD_NUMBER}-${env.GIT_SHA}"
+    }
+
+    stages {
+        stage('测试（并行）') {
+            parallel {
+                stage('后端') {
+                    when { changeset "demos/backend/**" }
+                    steps {
+                        dir('demos/backend') {
+                            sh 'python -m venv .venv'
+                            sh '.venv/bin/pip install -r requirements.txt'
+                            sh '.venv/bin/pytest'
+                        }
+                    }
+                }
+                stage('前端') {
+                    when {
+                        anyOf { changeset "demos/frontend/**"; changeset "pipelines/**" }
+                    }
+                    steps {
+                        dir('demos/frontend') {
+                            sh 'npm ci --prefer-offline --no-audit --no-fund'
+                            sh 'npm run lint && npm run test:cov'
+                            sh 'VITE_API_BASE=/api npm run build'
+                            sh 'bash ../../scripts/check-bundle-size.sh dist 200'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('构建镜像') {
+            steps {
+                buildImage('backend',  env.IMAGE_TAG)   // 共享库
+                buildImage('frontend', env.IMAGE_TAG)
+            }
+        }
+
+        stage('扫描') {
+            steps {
+                sh "trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --no-progress cicd-demo-backend:${env.IMAGE_TAG}"
+                sh "trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --no-progress cicd-demo-frontend:${env.IMAGE_TAG}"
+            }
+        }
+
+        stage('部署') {
+            steps {
+                sh "docker save cicd-demo-backend:${env.IMAGE_TAG}  | gzip > /tmp/b.tar.gz"
+                sh "docker save cicd-demo-frontend:${env.IMAGE_TAG} | gzip > /tmp/f.tar.gz"
+                sh "scp /tmp/b.tar.gz /tmp/f.tar.gz ${DEPLOY_SSH}:/tmp/"
+                sh "ssh ${DEPLOY_SSH} 'gunzip -c /tmp/b.tar.gz | docker load && gunzip -c /tmp/f.tar.gz | docker load && rm -f /tmp/b.tar.gz /tmp/f.tar.gz'"
+                sh "ssh ${DEPLOY_SSH} 'TAG=${env.IMAGE_TAG} bash -s' < scripts/deploy-local.sh"
+            }
+        }
+    }
+}

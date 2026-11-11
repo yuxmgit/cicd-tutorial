@@ -1,0 +1,80 @@
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+        timeout(time: 15, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+        disableConcurrentBuilds()
+    }
+
+    environment {
+        APP_NAME = 'cicd-demo'
+        GIT_SHA  = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+    }
+
+    parameters {
+        choice(name: 'TARGET', choices: ['none', 'staging'], description: '部署目标（本章只演示 none）')
+    }
+
+    stages {
+        stage('① 检出代码') {
+            steps {
+                checkout scm
+                sh 'git log -1 --pretty=format:"%h %an %s"'
+            }
+        }
+
+        stage('② 质量检查（并行）') {
+            failFast true
+            parallel {
+                stage('前端') {
+                    steps {
+                        dir('demos/frontend') {
+                            sh 'node --version && npm --version'
+                            echo '真实项目这里跑 npm ci / lint / test（第 07 章）'
+                        }
+                    }
+                }
+                stage('后端') {
+                    steps {
+                        dir('demos/backend') {
+                            sh 'python3 --version'
+                            echo '真实项目这里跑 pip install / pytest（第 08 章）'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('③ 构建制品') {
+            steps {
+                sh '''
+                    mkdir -p dist
+                    echo "build ${GIT_SHA} at $(date -u +%FT%TZ)" > dist/build-info.txt
+                    tar -czf dist/${APP_NAME}-${BUILD_NUMBER}.tar.gz dist/build-info.txt
+                '''
+                archiveArtifacts artifacts: 'dist/*.tar.gz', fingerprint: true
+            }
+        }
+
+        stage('④ 部署（占位）') {
+            when { expression { params.TARGET == 'staging' } }
+            steps {
+                echo '本章只演示结构；真实部署见第 12、15 章'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "构建成功 #${env.BUILD_NUMBER}，耗时 ${currentBuild.durationString}"
+        }
+        failure {
+            echo "构建失败，请查看 ${env.BUILD_URL}console"
+        }
+        cleanup {
+            cleanWs()
+        }
+    }
+}

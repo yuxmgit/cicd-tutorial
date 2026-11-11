@@ -1,0 +1,34 @@
+# 本地 Jenkins（CI 机）——第 03 章使用
+# 启动：docker compose -f pipelines/jenkins/docker-compose.jenkins.yml up -d
+# 停止：docker compose -f pipelines/jenkins/docker-compose.jenkins.yml down
+# 数据在命名卷 jenkins-home 里，down 不会丢；只有 down -v 才会删（危险）
+services:
+  jenkins:
+    image: jenkins/jenkins:lts-jdk17
+    container_name: jenkins
+    restart: unless-stopped
+    # 用 root 跑是为了避开 Windows 卷权限问题；企业环境应指定 uid:gid
+    user: root
+    ports:
+      - "8080:8080"   # Web UI
+      - "50000:50000" # Agent 通信（第 17 章自建 Agent 用）
+    environment:
+      TZ: Asia/Shanghai
+      JAVA_OPTS: >-
+        -Duser.timezone=Asia/Shanghai
+        -Dfile.encoding=UTF-8
+        -Xmx768m
+        -XX:MaxMetaspaceSize=256m
+        -Dhudson.model.DownloadService.noSignatureCheck=true
+    volumes:
+      - jenkins-home:/var/jenkins_home
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/login >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  jenkins-home:
+    name: jenkins-home

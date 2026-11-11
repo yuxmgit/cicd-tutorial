@@ -1,0 +1,35 @@
+# 依赖
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 构建产物（流水线会重新构建，不入库）
+dist/
+build/
+*.tar.gz
+*.jar
+
+# 环境与密钥（最重要的一行）
+.env
+.env.*
+!.env.example
+!.env.development
+
+# 数据与日志
+*.log
+*.db
+*.db-wal
+*.db-shm
+data/
+
+# 编辑器与系统
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+
+# 本地实验目录
+cicd-tutorial-labs/

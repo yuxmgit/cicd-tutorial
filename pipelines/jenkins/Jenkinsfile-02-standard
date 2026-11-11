@@ -1,0 +1,80 @@
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+        timeout(time: 25, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+        disableConcurrentBuilds(abortPrevious: true)
+    }
+
+    environment {
+        APP_DIR = 'demos'
+    }
+
+    stages {
+        stage('文档变更检测') {
+            steps {
+                script {
+                    def onlyDocs = currentBuild.changeSets.collectMany { it.items }
+                        .every { it.path.startsWith('docs/') || it.path.endsWith('.md') }
+                    if (onlyDocs) {
+                        echo '本次只改文档，跳过构建'
+                        error('SKIP_BUILD')
+                    }
+                }
+            }
+        }
+
+        stage('质量门禁') {
+            failFast true
+            parallel {
+                stage('前端') {
+                    steps {
+                        dir("${APP_DIR}/frontend") {
+                            sh 'npm ci'
+                            sh 'npm run lint'
+                            sh 'npm run test:cov'
+                            sh 'npm run build'
+                        }
+                    }
+                    post {
+                        success {
+                            archiveArtifacts artifacts: "${APP_DIR}/frontend/dist/**", allowEmptyArchive: true
+                        }
+                    }
+                }
+                stage('后端') {
+                    steps {
+                        dir("${APP_DIR}/backend") {
+                            sh 'python3 -m venv .venv'
+                            sh '.venv/bin/pip install -r requirements.txt'
+                            sh '.venv/bin/pytest'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('部署生产') {
+            when { branch 'main' }
+            steps {
+                timeout(time: 30, unit: 'MINUTES') {
+                    input message: "确认部署构建 ${env.BUILD_NUMBER} 到生产？",
+                          ok: '部署', submitter: 'admin'
+                }
+                withCredentials([sshUserPrivateKey(credentialsId: 'deploy-ssh-key', keyFileVariable: 'SSH_KEY')]) {
+                    sh '''
+                        ssh -i "$SSH_KEY" -o StrictHostKeyChecking=accept-new ubuntu@49.234.202.181 \
+                          "cd /opt/apps/cicd-demo && sudo ./scripts/deploy.sh $BUILD_NUMBER"
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        failure { echo "失败：${env.BUILD_URL}console" }
+        cleanup { cleanWs() }
+    }
+}

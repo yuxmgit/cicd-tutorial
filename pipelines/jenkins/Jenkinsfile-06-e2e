@@ -1,0 +1,102 @@
+# 端到端生产流水线：构建 → 测试 → 门禁 → 打镜像 → 部署 → 验证
+# 无镜像仓库时走 IMAGES_VIA_SAVE=1：镜像经 docker save + scp 传到服务器
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+        timeout(time: 40, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+        disableConcurrentBuilds(abortPrevious: true)
+    }
+
+    parameters {
+        booleanParam(name: 'SKIP_SECURITY_SCAN', defaultValue: false, description: '紧急发布跳过安全扫描（需审批）')
+        booleanParam(name: 'IMAGES_VIA_SAVE', defaultValue: true, description: '无镜像仓库时用 docker save + scp 传镜像')
+    }
+
+    environment {
+        DEPLOY_SSH   = 'yengxun-yun'                     // 本地 ~/.ssh/config 里的别名
+        APP_BASE_DIR = '/opt/apps/cicd-demo'
+        GIT_SHA      = sh(returnStdout: true, script: 'git rev-parse --short=7 HEAD').trim()
+        IMAGE_TAG    = "${env.BUILD_NUMBER}-${env.GIT_SHA}"
+    }
+
+    stages {
+        stage('① 后端测试') {
+            steps {
+                dir('demos/backend') {
+                    sh 'python -m venv .venv'
+                    sh '.venv/bin/pip install -r requirements.txt'
+                    sh '.venv/bin/pytest'
+                }
+            }
+        }
+
+        stage('② 前端测试与构建') {
+            steps {
+                dir('demos/frontend') {
+                    sh 'npm ci --no-audit --no-fund'
+                    sh 'npm run lint'
+                    sh 'npm run test:cov'
+                    sh 'VITE_API_BASE=/api npm run build'
+                    sh 'bash ../../scripts/check-bundle-size.sh dist 200'
+                }
+            }
+        }
+
+        stage('③ 安全扫描') {
+            when { expression { !params.SKIP_SECURITY_SCAN } }
+            steps {
+                sh 'bash scripts/security-scan.sh deps'
+            }
+        }
+
+        stage('④ 构建镜像') {
+            steps {
+                sh "docker build -f deploy/Dockerfile.backend   -t cicd-demo-backend:${IMAGE_TAG}   demos/backend"
+                sh "docker build -f deploy/Dockerfile.frontend  -t cicd-demo-frontend:${IMAGE_TAG}  demos/frontend"
+            }
+        }
+
+        stage('⑤ 镜像扫描') {
+            when { expression { !params.SKIP_SECURITY_SCAN } }
+            steps {
+                sh "bash scripts/security-scan.sh image cicd-demo-backend:${IMAGE_TAG}"
+                sh "bash scripts/security-scan.sh image cicd-demo-frontend:${IMAGE_TAG}"
+            }
+        }
+
+        stage('⑥ 部署到生产') {
+            steps {
+                script {
+                    if (params.IMAGES_VIA_SAVE) {
+                        // 无仓库路径：save → scp → load
+                        sh "docker save cicd-demo-backend:${IMAGE_TAG}   | gzip > /tmp/backend-${IMAGE_TAG}.tar.gz"
+                        sh "docker save cicd-demo-frontend:${IMAGE_TAG}  | gzip > /tmp/frontend-${IMAGE_TAG}.tar.gz"
+                        sh "scp /tmp/backend-${IMAGE_TAG}.tar.gz  ${DEPLOY_SSH}:/tmp/"
+                        sh "scp /tmp/frontend-${IMAGE_TAG}.tar.gz ${DEPLOY_SSH}:/tmp/"
+                        sh "ssh ${DEPLOY_SSH} 'gunzip -c /tmp/backend-${IMAGE_TAG}.tar.gz   | docker load'"
+                        sh "ssh ${DEPLOY_SSH} 'gunzip -c /tmp/frontend-${IMAGE_TAG}.tar.gz  | docker load'"
+                        sh "ssh ${DEPLOY_SSH} 'rm -f /tmp/*-${IMAGE_TAG}.tar.gz'"
+                        sh "ssh ${DEPLOY_SSH} 'TAG=${IMAGE_TAG} LOCAL_DEPLOY=1 bash -s' < scripts/deploy-local.sh"
+                    } else {
+                        // 有仓库路径：推送后服务器拉取
+                        sh "docker tag cicd-demo-backend:${IMAGE_TAG}  ccr.ccs.tencentyun.com/cicd-demo/cicd-demo-backend:${IMAGE_TAG}"
+                        sh "docker tag cicd-demo-frontend:${IMAGE_TAG} ccr.ccs.tencentyun.com/cicd-demo/cicd-demo-frontend:${IMAGE_TAG}"
+                        sh "ssh ${DEPLOY_SSH} 'sudo REGISTRY=ccr.ccs.tencentyun.com REGISTRY_NAMESPACE=cicd-demo bash /opt/apps/cicd-demo/scripts/deploy.sh ${IMAGE_TAG}'"
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        failure {
+            echo "流水线失败：${env.BUILD_URL}console"
+        }
+        cleanup {
+            cleanWs()
+        }
+    }
+}

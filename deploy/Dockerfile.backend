@@ -1,0 +1,44 @@
+# 后端生产镜像：多阶段 + 非 root 用户 + 内置健康检查
+# 构建（上下文必须是 demos/backend）：
+#   docker build -f deploy/Dockerfile.backend -t cicd-demo-backend:dev demos/backend
+
+FROM python:3.11-slim AS base
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    TZ=Asia/Shanghai
+WORKDIR /app
+
+# ---------- 阶段 1：安装依赖（单独一层，代码变动可复用） ----------
+FROM base AS deps
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# ---------- 阶段 2：运行时 ----------
+FROM base AS runtime
+
+# 只搬依赖，不搬编译缓存
+COPY --from=deps /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=deps /usr/local/bin /usr/local/bin
+
+COPY app ./app
+
+# 非 root 运行：容器逃逸时损失更小；uid 固定便于宿主机目录授权
+RUN useradd -m -u 10001 appuser \
+    && mkdir -p /data \
+    && chown -R appuser:appuser /app /data
+USER appuser
+
+ENV SQLITE_PATH=/data/app.db \
+    APP_PORT=8000 \
+    LOG_LEVEL=info
+
+EXPOSE 8000
+
+# 用 python 发请求而不是 curl：slim 镜像不一定带 curl
+HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
+  CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2).status==200 else 1)"
+
+# 单 worker：2G 机器上开多 worker 只会互相抢内存（见第 03 章内存核算）
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", \
+     "--workers", "1", "--timeout-graceful-shutdown", "20", "--access-log"]

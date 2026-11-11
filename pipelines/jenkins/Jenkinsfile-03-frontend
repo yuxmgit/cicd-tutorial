@@ -1,0 +1,88 @@
+pipeline {
+    agent {
+        docker {
+            image 'node:20-alpine'
+            args '-v jenkins-npm-cache:/root/.npm'
+            reuseNode true
+        }
+    }
+
+    options {
+        timestamps()
+        timeout(time: 20, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+        disableConcurrentBuilds(abortPrevious: true)
+    }
+
+    environment {
+        CI = 'true'
+        NODE_ENV = 'production'
+    }
+
+    stages {
+        stage('① 环境自检') {
+            steps {
+                sh 'node -v && npm -v'
+                sh 'test -f package-lock.json || (echo "缺少 package-lock.json，拒绝构建"; exit 1)'
+            }
+        }
+
+        stage('② 安装依赖') {
+            steps {
+                sh 'npm ci --prefer-offline --no-audit --no-fund'
+            }
+        }
+
+        stage('③ 代码规范') {
+            steps {
+                sh 'npm run lint'
+            }
+        }
+
+        stage('④ 单元测试') {
+            steps {
+                sh 'npm run test:cov'
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: 'coverage/junit.xml'
+                }
+            }
+        }
+
+        stage('⑤ 构建') {
+            steps {
+                sh 'VITE_API_BASE=/api npm run build'
+            }
+        }
+
+        stage('⑥ 体积门禁') {
+            steps {
+                // 脚本在仓库根目录，注意工作目录是 demos/frontend
+                sh 'bash ../../scripts/check-bundle-size.sh dist 200'
+            }
+        }
+
+        stage('⑦ 归档') {
+            steps {
+                sh '''
+                    cd ../..
+                    mkdir -p dist-archive
+                    tar -czf dist-archive/frontend-${BUILD_NUMBER}-${GIT_COMMIT:0:7}.tar.gz -C demos/frontend/dist .
+                    ls -lh dist-archive/
+                '''
+                archiveArtifacts artifacts: 'dist-archive/*.tar.gz', fingerprint: true
+            }
+        }
+    }
+
+    post {
+        failure {
+            echo "前端流水线失败：${env.BUILD_URL}console"
+            echo '优先看：lint 报错 → 单测失败 → 体积超标'
+        }
+        cleanup {
+            cleanWs()
+        }
+    }
+}

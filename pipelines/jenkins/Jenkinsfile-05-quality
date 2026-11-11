@@ -1,0 +1,74 @@
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+        timeout(time: 30, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+    }
+
+    parameters {
+        booleanParam(name: 'SKIP_SECURITY_SCAN', defaultValue: false, description: '紧急发布跳过安全扫描（需审批）')
+    }
+
+    stages {
+        stage('① 后端测试与覆盖率') {
+            steps {
+                dir('demos/backend') {
+                    sh 'python -m venv .venv'
+                    sh '.venv/bin/pip install -r requirements.txt'
+                    sh '.venv/bin/pytest'
+                }
+            }
+        }
+
+        stage('② 前端测试与覆盖率') {
+            steps {
+                dir('demos/frontend') {
+                    sh 'npm ci'
+                    sh 'npm run lint'
+                    sh 'npm run test:cov'
+                }
+            }
+        }
+
+        stage('③ 依赖与密钥扫描') {
+            when { expression { !params.SKIP_SECURITY_SCAN } }
+            steps {
+                sh 'bash scripts/security-scan.sh secrets'
+                sh 'bash scripts/security-scan.sh deps'
+            }
+        }
+
+        stage('④ 构建镜像') {
+            steps {
+                sh 'docker build -f deploy/Dockerfile.backend -t cicd-demo-backend:${BUILD_NUMBER} demos/backend'
+                sh 'docker build -f deploy/Dockerfile.frontend -t cicd-demo-frontend:${BUILD_NUMBER} demos/frontend'
+            }
+        }
+
+        stage('⑤ 镜像漏洞扫描') {
+            when { expression { !params.SKIP_SECURITY_SCAN } }
+            steps {
+                sh 'bash scripts/security-scan.sh image cicd-demo-backend:${BUILD_NUMBER}'
+                sh 'bash scripts/security-scan.sh image cicd-demo-frontend:${BUILD_NUMBER}'
+            }
+        }
+
+        stage('⑥ 例外审批') {
+            when { expression { params.SKIP_SECURITY_SCAN } }
+            steps {
+                timeout(time: 30, unit: 'MINUTES') {
+                    input message: '你正在跳过安全扫描，原因会记入构建日志',
+                          ok: '我确认，继续发布', submitter: 'admin'
+                }
+                echo "本次构建跳过安全扫描，审批人：${env.APPROVER ?: 'unknown'}"
+            }
+        }
+    }
+
+    post {
+        failure { echo "门禁未通过：${env.BUILD_URL}console" }
+        cleanup { cleanWs() }
+    }
+}

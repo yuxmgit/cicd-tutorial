@@ -1,0 +1,31 @@
+# 备选部署方式：systemd 托管（第 12 章"第 2 级"使用）
+# 适用场景：不用 Docker 的传统部署；本项目生产主线是 Docker Compose，此文件仅作教学对照
+# 安装：
+#   sudo cp cicd-demo.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now cicd-demo
+
+[Unit]
+Description=CI/CD Demo API (FastAPI + uvicorn)
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+# 应用代码放在版本目录，由 current 软链指向；重启不需要改这个文件
+WorkingDirectory=/opt/apps/cicd-demo/current
+Environment="SQLITE_PATH=/opt/apps/cicd-demo/shared/data/app.db"
+Environment="APP_PORT=8000"
+Environment="LOG_LEVEL=info"
+# venv 由流水线在各 release 目录内准备好
+ExecStart=/opt/apps/cicd-demo/current/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=3
+# 优雅退出：与 uvicorn 的 graceful shutdown 时间对齐
+TimeoutStopSec=30
+# 日志进 journald：journalctl -u cicd-demo -f
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
