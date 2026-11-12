@@ -116,7 +116,7 @@ docker info --format "{{.MemTotal}}"
 ```yaml
 services:
   jenkins:
-    image: jenkins/jenkins:lts-jdk17
+    image: jenkins/jenkins:lts-jdk21
     container_name: jenkins
     restart: unless-stopped
     user: root
@@ -141,7 +141,7 @@ volumes:
 
 | 配置 | 为什么 |
 | --- | --- |
-| `jenkins/jenkins:lts-jdk17` | LTS 稳定版；带 JDK 17，跑现代插件不报"不支持 Java 8" |
+| `jenkins/jenkins:lts-jdk21` | LTS 稳定版；带 JDK 21（JDK 17 已进入 EOL，Jenkins 2026-03 后不再支持，新装直接上 21） |
 | `container_name: jenkins` | 后面 `docker logs jenkins` 方便 |
 | `user: root` | 避开 Windows 卷权限问题；企业环境应改成 `uid:gid` |
 | `8080:8080` | Web 界面；宿主机 8080 被占就改左边，如 `18080:8080` |
@@ -176,32 +176,71 @@ docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
 
 ### 步骤 4【本地】装插件：只装你用得上的
 
-界面会问"安装推荐的插件"还是"选择插件"。**选"选择插件"，先不装任何推荐插件**，然后按下面清单勾选（搜索框逐个搜）：
+界面会问"安装推荐的插件"还是"选择插件"。**选"选择插件"，先不装任何推荐插件**，然后按下面清单勾选（搜索框搜**插件 ID**，不是界面显示名）：
 
-| 插件 | 干什么 | 哪一章用 |
-| --- | --- | --- |
-| Pipeline | 流水线核心（Declarative 语法） | 第 04 章 |
-| Git | 拉代码 | 第 04 章 |
-| Credentials Binding | 在流水线里安全引用凭据 | 第 05 章 |
-| SSH Agent | 用 SSH 私钥连生产机 | 第 12 章 |
-| Blue Ocean | 好看的流水线可视化界面 | 第 05 章 |
-| Docker Pipeline | 流水线里 `docker.build` | 第 10 章 |
-| GitHub Branch Source | 接 GitHub 多分支 | 第 05 章 |
-| GitLab | 接 GitLab 的 Webhook 与多分支 | 第 05 章 |
-| Workspace Cleanup | 每次构建前清理工作区（防脏缓存） | 第 16 章 |
-| Timestamper | 给每行日志加时间戳（排错救命） | 全程 |
-| AnsiColor | 日志带颜色 | 第 15 章 |
-| Role-based Authorization Strategy | 细粒度权限（谁能部署生产） | 第 17 章 |
+| 插件（显示名） | **搜索用插件 ID** | 干什么 | 哪一章用 |
+| --- | --- | --- | --- |
+| Pipeline | `workflow-aggregator` | 流水线核心（Declarative 语法） | 第 04 章 |
+| Git | `git` | 拉代码 | 第 04 章 |
+| Credentials Binding | `credentials-binding` | 在流水线里安全引用凭据 | 第 05 章 |
+| SSH Agent | `ssh-agent` | 用 SSH 私钥连生产机 | 第 12 章 |
+| Blue Ocean | `blueocean` | 流水线可视化界面（**已停止活跃维护**，可选） | 第 05 章 |
+| Docker Pipeline | `docker-workflow` | 流水线里 `docker.build` | 第 10 章 |
+| GitHub Branch Source | `github-branch-source` | 接 GitHub 多分支 | 第 05 章 |
+| GitLab | `gitlab-plugin` | 接 GitLab 的 Webhook 与多分支 | 第 05 章 |
+| Workspace Cleanup | `ws-cleanup` | 每次构建前清理工作区（防脏缓存） | 第 16 章 |
+| Timestamper | `timestamper` | 给每行日志加时间戳（排错救命） | 全程 |
+| AnsiColor | `ansicolor` | 日志带颜色 | 第 15 章 |
+| Role-based Authorization Strategy | `role-strategy` | 细粒度权限（谁能部署生产） | 第 17 章 |
 
 > **为什么不装"推荐插件"**：推荐清单有 100+ 个，装完 Jenkins 又慢又重，还容易版本冲突。用哪个装哪个，用完可以卸。
 
-如果插件下载卡住（国内常见），可以在 **Manage Jenkins → Plugins → Advanced → Update Site** 把 URL 换成清华镜像：
+**三个名字搜不到的插件，这样解决**（都是高频踩坑）：
+
+| 你搜的 | 为什么搜不到 | 正确做法 |
+| --- | --- | --- |
+| `AnsiColor` | 显示名是连写的 `AnsiColor`，搜索索引按 ID `ansicolor` 匹配 | 搜 `ansi` 或 `ansicolor` |
+| `Docker Pipeline` | 搜索按 ID 匹配，ID 是 `docker-workflow`，和显示名完全不同 | 搜 `docker-workflow` 或 `workflow`，在结果里认显示名 "Docker Pipeline" |
+| `Blue Ocean` | 它是 60+ 个子插件的聚合包，且官方已宣布**停止活跃开发**，新版插件中心可能归入 Deprecated 分组排到很后面 | ① 搜 `blueocean`；② 还没有就手动装（见下）；③ **它不是必需品**——Jenkins 自带的 Stage View（构建页左侧）已够本书所有章节使用，实在装不上可以跳过 |
+
+**兜底方案：手动上传 .hpi 安装**（镜像源滞后或搜索索引异常时）：
 
 ```text
-https://mirrors.tuna.tsinghua.edu.cn/jenkins/updates/update-center.json
+1. 打开 https://plugins.jenkins.io/ 搜插件名（如 AnsiColor）
+2. 进插件页 → Releases → 下载最新 .hpi 文件
+3. Jenkins → Manage Jenkins → Plugins → Advanced settings
+   → 拉到底 "Deploy Plugin" → 上传 .hpi → 勾 Restart
+4. 容器方式额外一步：装完重启容器
+   docker restart jenkins
 ```
 
-> 镜像偶尔滞后于官方，装不上最新插件时换回来即可。
+> 手动装聚合包（如 Blue Ocean）时，`.hpi` 会自动带上依赖，一次性下齐，不用逐个装子插件。
+
+**仍然搜不到任何插件的通用排查**：
+
+```powershell
+# 1. 先确认插件中心元数据加载成功（国内网络问题占八成）
+#    Manage Jenkins → Plugins → Updates 页 → 点 "Check now"
+#    若一直转圈或报错，按上面的清华镜像改 Update Site 后重试
+
+# 2. 看容器日志有没有 update center 报错
+docker logs jenkins | Select-String -Pattern "update|plugin" | Select-Object -Last 20
+
+# 3. 改镜像后必须重启才生效
+docker restart jenkins
+```
+
+如果插件下载卡住（国内常见），先**确认镜像地址还活着**再改，不要照抄网上过期链接（实测：清华的 `update-center.json` 路径已 404）：
+
+```powershell
+# 从容器里测三个地址，谁的 HTTP 码是 200/302 就用谁
+docker run --rm --entrypoint curl jenkins/jenkins:lts-jdk21 -s -o /dev/null -m 20 -w "official: %{http_code}`n" "https://updates.jenkins.io/update-center.json?version=2.541.3"
+docker run --rm --entrypoint curl jenkins/jenkins:lts-jdk21 -s -o /dev/null -m 20 -w "jenkins-zh: %{http_code}`n" "https://updates.jenkins-zh.cn/update-center.json?version=2.541.3"
+```
+
+> 2026-11 实测：官方源 302（可用，慢但能下）、`jenkins-zh` 不可达、清华该路径 404。**结论：优先用官方源 + 下面的 `jenkins-plugin-cli` 重试**，比折腾镜像稳。
+>
+> 若确实要换镜像：**Manage Jenkins → Plugins → Advanced settings → Update Site**，填 `curl` 验证过返回 200 的地址；改完必须 `docker restart jenkins` 才生效。
 
 ### 步骤 5【本地】建管理员、改三个设置
 
@@ -210,6 +249,143 @@ https://mirrors.tuna.tsinghua.edu.cn/jenkins/updates/update-center.json
    - `Jenkins URL` 填 `http://localhost:8080/`（后面接 Webhook 时要改成公网可达地址）
    - `时区` 选 `Asia/Shanghai`
 3. **Manage Jenkins → Security**：授权策略先用 `Logged-in users can do anything`（单机学习阶段），第 17 章再收紧。
+
+### 步骤 5+【本地】首屏那一堆红黄警告，只处理两条
+
+刚登录时 `Manage Jenkins` 顶部会刷出一屏警告，看着吓人，但严重程度完全不同。**先分类再动手，不要看到红色就乱点"升级"**：
+
+| 警告 | 严重程度 | 要不要现在处理 |
+| --- | --- | --- |
+| `Pipeline: Model API ... Failed to load: Jackson 2 API Plugin` | 🔴 **真问题**：插件依赖缺失，Pipeline 语法可能整体不可用 | **必须处理**（见下） |
+| `Java 17 end of life in Jenkins` | 🟠 环境过时：JDK 17 已停止支持 | 建议处理（见下，改镜像 JDK 21） |
+| `Multiple security vulnerabilities in Jenkins 2.541.3 ...` | 🟠 版本旧：有已修复的漏洞 | 学习环境可暂缓；对外暴露前必须升 |
+| `New version of Jenkins is available` | 🟡 提示 | 同上，和升级一起做 |
+| `Building on the built-in node can be a security issue` | ⚪ 对单机学习无影响 | 点 **Dismiss** 即可（第 17 章再谈 Agent 隔离） |
+| `CSP is disabled` | ⚪ 提示 | 点 **Dismiss** |
+
+#### 处理 A：Jackson 2 API 加载失败（必做）
+
+现象：某插件（这里是 `pipeline-model-api`）因依赖 `jackson2-api` 加载失败而报红。原因通常是**首次安装被网络中断**，包只下了一半。
+
+```text
+1. Manage Jenkins → Plugins → Installed plugins
+   搜索 jackson2-api，看状态是不是 "Failed to load" / 版本异常
+2. 切到 Updates 标签
+   若有 jackson2-api 可更新，勾选 → "Download now and install after restart"
+3. 勾 Restart Jenkins when installation is complete → 等它自己重启
+4. 重启后回到 Manage Jenkins，红色横幅应消失
+```
+
+若列表里根本没有 `jackson2-api`，或升级后仍失败 → 手动装：`plugins.jenkins.io/jackson2-api` 下载 `.hpi` → Plugins → Advanced settings → Deploy Plugin 上传 → 重启。
+
+**判断是否真的修好**：新建一个 Pipeline 任务，粘贴下面的最小脚本，能正常解析（不报 `No such DSL method 'pipeline'`）就说明 Pipeline 模型恢复：
+
+```groovy
+pipeline { agent any; stages { stage('ok') { steps { echo 'pipeline model ok' } } } }
+```
+
+#### 处理 B：JDK 17 到期（建议做，一条命令）
+
+Jenkins 官方已明确 JDK 17 的支持终点（2026-03 之后不再支持），新环境直接用 JDK 21 镜像。**改镜像不会丢数据**——Jenkins 的配置、任务、插件全在命名卷 `jenkins-home` 里，容器只是"可替换的外壳"。
+
+```powershell
+# 1. 先备份卷（养成习惯，第 17 章会系统讲）
+docker run --rm -v jenkins-home:/data -v ${PWD}:/backup alpine `
+  tar czf /backup/jenkins-home-$(Get-Date -Format yyyyMMdd-HHmm).tar.gz -C /data .
+
+# 2. 改 compose 里的镜像为 lts-jdk21（本项目文件已改好），然后重建容器
+docker compose -f pipelines/jenkins/docker-compose.jenkins.yml pull
+docker compose -f pipelines/jenkins/docker-compose.jenkins.yml up -d
+
+# 3. 等 1~2 分钟，看启动日志
+docker logs -f jenkins
+#    见到 "Jenkins is fully up and running" 即成功
+```
+
+> **注意**：`lts-jdk21` 指向的是**当前最新 LTS**，所以这一步实际上同时完成了"换 JDK"和"升级 Jenkins 核心"。升级后插件可能需要重装或升级一次（旧插件偶尔不兼容新核心），这也是为什么先备份。若升级后 Jenkins 起不来，回退方法：把镜像改回原 tag（或用备份包恢复卷）再 `up -d`。
+
+**升级顺序建议**：先 A（修插件）→ 再 B（换 JDK/升核心）→ 最后统一在 `Plugins → Updates` 里升级插件并重启一次。反过来的话，你可能在"核心已换、插件还半坏"的状态下排查两件事，很痛苦。
+
+#### 处理 A+：依赖级联失败（一次报出十几个 Failed to load）
+
+真实现象长这样（首次安装被中断后最常见）：
+
+```text
+Failed to load: Jackson 2 API Plugin (jackson2-api ...)
+ - Plugin is missing: jaxb (2.3.9-143...)
+Failed to load: Branch API Plugin (branch-api ...)
+ - Plugin is missing: cloudbees-folder (6.1053...)
+Failed to load: GitHub API Plugin (github-api ...)
+ - Failed to load: Jackson 2 API Plugin (...)
+Failed to load: GitHub plugin (github ...)
+ - Failed to load: GitHub API Plugin (...)
+Failed to load: JUnit Plugin (junit ...)
+ - Failed to load: ECharts API Plugin (...)
+Failed to load: Matrix Project Plugin (...)   ← 依赖 junit
+Failed to load: Pipeline (workflow-aggregator) ← 依赖下游一串
+```
+
+**别逐个修那十几个**。看每条的第二行——`Plugin is missing: xxx` 才是根因，其余都是它的下游。上例的根只有两个：`jaxb` 和 `cloudbees-folder`。
+
+**诊断（先在容器里确认谁真的缺）**：
+
+```powershell
+docker exec jenkins ls /var/jenkins_home/plugins | Select-String -Pattern "^jaxb|^cloudbees-folder|^jackson2-api"
+# 无输出 = 该插件文件确实不存在（下载失败），不是"版本不兼容"
+```
+
+**修复（两条命令，比点界面可靠）**：
+
+```powershell
+# 用官方镜像自带的插件安装器，按 ID 安装缺失的根依赖
+docker exec jenkins jenkins-plugin-cli --plugins jaxb cloudbees-folder
+
+# 重启让插件按依赖顺序重新加载
+docker restart jenkins
+```
+
+> `jenkins-plugin-cli` 会自动拉齐这两个插件的传递依赖。它比 UI 的优势：有明确报错、可重复执行、可写进 Dockerfile（第 17 章"插件清单化"就靠它）。
+
+**验证**：重启后 `Manage Jenkins` 顶部的加载失败横幅应全部消失。若还剩个别，再按同样的方法看它缺什么——通常最多两轮就干净了。
+
+```powershell
+# 看真实失败原因（UI 只显示第一层，日志里有完整的）
+docker logs jenkins | Select-String -Pattern "SEVERE|Failed to load|Plugin is missing" | Select-Object -Last 30
+```
+
+> **为什么会出现这种局面**：向导页一次性下载几十个插件，国内网络下中途断掉，Jenkins 会装上"主插件"却漏掉"依赖插件"，于是表面上装成功了、重启后却整片飘红。**这也是本书建议"向导里什么都不选、登录后用 `jenkins-plugin-cli` 按清单装"的原因**——清单可控、失败可重试。
+
+**完整修复实录（2026-11 真实案例，照此操作）**
+
+现象：`Manage Jenkins` 顶部一次报出 10+ 条 `Failed to load`，逐条看是 `Plugin is missing: jaxb` / `Plugin is missing: cloudbees-folder` / `Plugin is missing: workflow-basic-steps`……逐个在 UI 里补装，补完又冒出新的缺失。
+
+```powershell
+# ① 先看插件目录：0 字节的 .tmp = 下载失败留下的残骸；.bak = 升级中断
+docker exec jenkins bash -c "ls -l /var/jenkins_home/plugins/*.tmp /var/jenkins_home/plugins/*.bak 2>/dev/null"
+
+# ② 看真实原因（UI 只显示第一层，日志里有关键的 SEVERE + 镜像地址）
+docker logs jenkins 2>&1 | Select-String -Pattern "Failed to install|Plugin is missing" | Select-Object -Last 10
+#   典型行：Failed to load https://updates.jenkins.io/download/plugins/jaxb/...
+#            → https://mirror.ossplanet.net/jenkins/plugins/jaxb/...    ← 网络超时
+
+# ③ 停机，用官方安装器一次性补齐整个依赖图（--user root 必需：数据卷里的文件属主是 root）
+docker stop jenkins
+docker run --rm --user root -v jenkins-home:/var/jenkins_home --entrypoint bash jenkins/jenkins:lts-jdk21 -c `
+  "rm -f /var/jenkins_home/plugins/*.tmp /var/jenkins_home/plugins/*.bak; jenkins-plugin-cli --plugin-download-directory /var/jenkins_home/plugins --plugins 'workflow-aggregator git credentials-binding ssh-agent docker-workflow github-branch-source gitlab-plugin ws-cleanup timestamper ansicolor role-strategy matrix-auth'"
+#   输出只有一行 "Done" 就是成功（它把传递依赖一起装齐，共约 88 个 .jpi）
+
+# ④ 启动并验证
+docker start jenkins
+Start-Sleep -Seconds 80
+docker logs jenkins --since 3m 2>&1 | Select-String -Pattern "Failed to load|Plugin is missing"     # 应无输出
+docker logs jenkins --since 3m 2>&1 | Select-String -Pattern "Started all plugins|fully up and running"
+```
+
+**三个必须记住的细节**：
+
+1. **`--user root` 不能省**。官方镜像默认以 `jenkins`（uid 1000）运行，而你的 compose 用了 `user: root`，数据卷里的插件文件属主是 root——不加这个参数就会看到一串 `Permission denied`。
+2. **不要试图用镜像源绕**。实测清华的 `update-center.json` 已 404、`jenkins-zh` 不可达；官方源虽慢，但 `jenkins-plugin-cli` 支持重试，一次 `Done` 比反复点界面高效。
+3. **`Done` 只是"下载完成"，不代表"加载成功"**。必须看启动日志里有没有 `Failed to load`，以及是否出现 **`Started all plugins`**——那才是真正干净的信号。
 
 ### 步骤 6【本地】跑通第一条流水线
 

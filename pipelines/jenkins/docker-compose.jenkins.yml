@@ -4,7 +4,8 @@
 # 数据在命名卷 jenkins-home 里，down 不会丢；只有 down -v 才会删（危险）
 services:
   jenkins:
-    image: jenkins/jenkins:lts-jdk17
+    # lts-jdk21：Java 17 已进入 EOL 倒计时（Jenkins 官方 2026-03 后不再支持），新装一律 JDK 21
+    image: jenkins/jenkins:lts-jdk21
     container_name: jenkins
     restart: unless-stopped
     # 用 root 跑是为了避开 Windows 卷权限问题；企业环境应指定 uid:gid
