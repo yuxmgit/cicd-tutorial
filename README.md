@@ -46,7 +46,7 @@ CI/CD 就是给软件团队装上这套中央厨房流水线。
 | --- | --- | --- | --- | --- |
 | 00 | [环境与基本功](docs/00-环境与基本功.md) | 只讲后面 20 章真正用得到的 Linux/SSH 命令 | ★☆☆ | ✅ 完成 |
 | 01 | [CI/CD 到底是什么](docs/01-CICD到底是什么.md) | 中央厨房比喻讲透构建/制品/环境/发布/回滚 | ★☆☆ | ✅ 完成 |
-| 02 | [Git 工作流](docs/02-Git工作流.md) | 分支模型、保护分支、Conventional Commits、语义化版本 | ★☆☆ | ✅ 完成 |
+| 02 | [Git 工作流](docs/02-Git工作流.md) | 分支模型、GitHub 仓库与分支保护/Tag 保护全配置、Tag 与 Release、switch/restore 分工、常用命令详解 | ★★☆ | ✅ 完成 |
 | 03 | [Jenkins 落地](docs/03-Jenkins落地.md) | Docker Desktop 起 Jenkins + 内存核算表 | ★★☆ | ✅ 完成 |
 | 04 | [Pipeline 语法](docs/04-Pipeline语法.md) | Declarative 全要素 + 首个可跑通流水线 | ★★☆ | ✅ 完成 |
 | 05 | [Jenkins 工程化能力](docs/05-Jenkins工程化能力.md) | 凭据、参数化、Multibranch、共享库、Webhook | ★★★ | ✅ 完成 |
