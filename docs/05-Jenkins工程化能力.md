@@ -71,7 +71,7 @@ sequenceDiagram
 | Username | `ubuntu` |
 | Private Key | 选 `Enter directly`，粘贴你的**私钥**内容 |
 
-私钥从哪来？就是你本机 `C:\Users\yuxiangming\.ssh\id_ed25519` 的内容：
+私钥从哪来？就是你本机 `%USERPROFILE%\.ssh\id_ed25519`（`$env:USERPROFILE\.ssh\id_ed25519`）的内容：
 
 ```powershell
 Get-Content $env:USERPROFILE\.ssh\id_ed25519
@@ -86,9 +86,9 @@ Get-Content $env:USERPROFILE\.ssh\id_ed25519
 | 字段 | 填什么 |
 | --- | --- |
 | Kind | `Username with password` |
-| ID | `tcr-registry`（示例） |
-| Username | 腾讯云账号或 TCR 用户名 |
-| Password | 对应的密码 / Token |
+| ID | `ghcr-registry`（示例） |
+| Username | GitHub 用户名 |
+| Password | PAT（勾选 `write:packages` / `read:packages`） |
 
 #### ③ Secret text（Token、Webhook 密钥）
 
@@ -98,6 +98,21 @@ Get-Content $env:USERPROFILE\.ssh\id_ed25519
 | ID | `github-webhook-token` |
 | Secret | 你生成的一串随机字符 |
 
+#### ④ GitHub 仓库读取凭据（私有仓库的 Multibranch 任务要用）
+
+| 字段 | 填什么 |
+| --- | --- |
+| Kind | `Username with password` |
+| ID | `github-repo-readonly` |
+| Username | 你的 GitHub 用户名 |
+| Password | Personal Access Token（classic 勾 `repo`；fine-grained 只给 `Contents: Read-only` 即可） |
+
+三个易混点：
+
+1. **不是账号密码**。GitHub 早已禁用密码认证，Password 必须填 PAT，否则报 `Authentication failed`。
+2. **和 ② 不是一回事**。`ghcr-registry` 是给 `docker login` 镜像仓库的，这条是给"拉代码"用的，别想着共用一个。
+3. **和 ① 也不冲突**。① 的 SSH 私钥是"部署到服务器"，这条是"从 GitHub 读代码"；服务器上的 `authorized_keys` 和 GitHub 上的公钥两套东西。
+
 生成随机 Token：
 
 ```powershell
@@ -105,7 +120,7 @@ Get-Content $env:USERPROFILE\.ssh\id_ed25519
 -join ((48..57)+(65..90)+(97..122) | Get-Random -Count 32 | ForEach-Object {[char]$_})
 ```
 
-**命名规范（团队约定，很值得抄）**：`<用途>-<对象>-<类型>`，例如 `deploy-ssh-key`、`tcr-registry`、`notify-wecom-token`。**永远不要用 `my-secret-1` 这种名字**——三个月后没人知道它是干什么的。
+**命名规范（团队约定，很值得抄）**：`<用途>-<对象>-<类型>`，例如 `deploy-ssh-key`、`ghcr-registry`、`github-repo-readonly`、`notify-wecom-token`。**永远不要用 `my-secret-1` 这种名字**——三个月后没人知道它是干什么的。
 
 ### 步骤 2 在流水线里安全使用凭据
 
@@ -118,8 +133,8 @@ withCredentials([sshUserPrivateKey(credentialsId: 'deploy-ssh-key', keyFileVaria
 }
 
 // ② 用户名密码：分别注入两个变量
-withCredentials([usernamePassword(credentialsId: 'tcr-registry', usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')]) {
-    sh 'echo "$REG_PASS" | docker login -u "$REG_USER" --password-stdin ccr.ccs.tencentyun.com'
+withCredentials([usernamePassword(credentialsId: 'ghcr-registry', usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')]) {
+    sh 'echo "$REG_PASS" | docker login -u "$REG_USER" --password-stdin ghcr.io'
 }
 
 // ③ 密文：注入一个变量
@@ -217,21 +232,139 @@ pipeline {
 
 三条路，按推荐顺序：
 
-#### 路线 A：内网穿透（教学/演示最快）
+#### 路线 A：自建 frp（推荐，公网地址永久不变）
 
-用 cpolar、ngrok、frp 任选一个，把本地 8080 暴露成一个公网地址，例如 `https://abc123.cpolar.top`。
+先说结论：**cpolar、ngrok、natapp 的免费版每次重启都换域名**，Webhook 得跟着改一遍，只能演示、不能日常用。要"填一次永远不变"，最省事的做法是用已有的云服务器自建 frp——公网地址固定为 `http://49.234.202.181:18080`，本机重启也不变。
 
-1. Jenkins 里设置 **Jenkins URL** 为这个公网地址（Manage Jenkins → System）。
+**先理解方向，后面就不会绕晕**：不是服务器连你，而是你本机的 `frpc` **主动出站**连到服务器的 `frps`，把本机 8080 注册到服务器的 18080 上：
+
+```text
+GitHub ──► 49.234.202.181:18080（frps 公网入口）
+                    │  复用已建立的隧道
+                    ▼
+           127.0.0.1:8080（本机 Win11 上的 Jenkins，完全不用改）
+```
+
+好处：不需要公网 IP、不用改路由器端口映射、Jenkins 依然在本机 `localhost:8080`。
+
+**① 服务端（腾讯云 49.234.202.181）**
+
+```bash
+# 下载（国内服务器直连 GitHub 极慢，用加速前缀；版本号以 Releases 最新为准）
+cd /opt
+VER=0.72.0
+sudo wget -O frp.tar.gz "https://ghfast.top/https://github.com/fatedier/frp/releases/download/v${VER}/frp_${VER}_linux_amd64.tar.gz"
+gzip -t frp.tar.gz && echo "压缩包完好"     # 必须先校验，见排错表里的 EOF 坑
+sudo tar -zxf frp.tar.gz && sudo mv frp_${VER}_linux_amd64 frp
+
+# 生成 token，复制下来，客户端要用同一串
+tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32; echo
+
+sudo tee /opt/frp/frps.toml <<'EOF'
+bindPort = 7000
+auth.method = "token"
+auth.token = "把上行生成的32位随机串粘这里"
+webServer.addr = "127.0.0.1"
+webServer.port = 7500
+EOF
+
+# 前台试跑，看到 frps started successfully 就 Ctrl+C
+sudo /opt/frp/frps -c /opt/frp/frps.toml
+```
+
+注册为系统服务（开机自启）：
+
+```bash
+sudo tee /etc/systemd/system/frps.service <<'EOF'
+[Unit]
+Description=frp server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/opt/frp/frps -c /opt/frp/frps.toml
+Restart=always
+RestartSec=5
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload && sudo systemctl enable --now frps
+sudo systemctl status frps --no-pager
+```
+
+**② 放行端口（云厂商安全组 + 系统防火墙，两处都要）**
+
+腾讯云轻量：实例 → 防火墙 → 添加规则；CVM：安全组 → 入站规则。两条：
+
+| 协议端口 | 来源 | 用途 |
+| --- | --- | --- |
+| TCP:7000 | 0.0.0.0/0 | frp 控制通道 |
+| TCP:18080 | 0.0.0.0/0 | 对外暴露 Jenkins |
+
+```bash
+# 系统里还开了 firewalld 的话
+sudo firewall-cmd --permanent --add-port=7000/tcp --add-port=18080/tcp && sudo firewall-cmd --reload
+```
+
+**③ 客户端（Win11，Jenkins 所在的机器）**
+
+下载 `frp_0.72.0_windows_amd64.zip`（GitHub 慢就同样加 `https://ghfast.top/` 前缀），解压到 `C:\frp`，删掉 `frps.exe`、`frps.toml`，新建 `C:\frp\frpc.toml`：
+
+```toml
+serverAddr = "49.234.202.181"
+serverPort = 7000
+
+auth.method = "token"
+auth.token = "和服务器 frps.toml 完全相同"
+
+[[proxies]]
+name = "jenkins"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 8080
+remotePort = 18080
+```
+
+启动并验证（本机 Jenkins 要先开着）：
+
+```powershell
+C:\frp\frpc.exe -c C:\frp\frpc.toml
+# 成功标志：login to server success + start proxy success
+```
+
+然后**用手机流量**（别用公司 WiFi）打开 `http://49.234.202.181:18080`，能看到 Jenkins 登录页就说明全链路通了。
+
+最后做开机自启，否则重启电脑 Webhook 就断：
+
+```powershell
+# 方式一：任务计划程序（无需装第三方工具）
+schtasks /create /tn "frpc" /tr "C:\frp\frpc.exe -c C:\frp\frpc.toml" /sc onstart /ru SYSTEM /rl highest
+
+# 方式二：nssm 注册成服务，可自动重启进程，更稳
+nssm install frpc C:\frp\frpc.exe -c C:\frp\frpc.toml
+nssm set frpc Start SERVICE_AUTO_START
+nssm start frpc
+```
+
+**④ 接到 Jenkins 与 Git 仓库上**
+
+1. Jenkins → Manage Jenkins → System → **Jenkins URL** 填 `http://49.234.202.181:18080/`（不填对，邮件和构建里的链接全是 localhost）。
 2. GitHub 仓库 → Settings → Webhooks → Add webhook：
-   - Payload URL：`https://abc123.cpolar.top/github-webhook/`（**结尾斜杠不能少**）
+   - Payload URL：`http://49.234.202.181:18080/github-webhook/`（**结尾斜杠不能少**）
    - Content type：`application/json`
-   - Secret：填你在 Jenkins 里建的 `github-webhook-token` 值
-   - 事件：`Just the push event`
+   - Secret：填 Jenkins 里 `github-webhook-token` 的值
+   - 事件：`Just the push event`，勾上 Active
 3. GitLab 仓库 → Settings → Webhooks：
-   - URL：`https://abc123.cpolar.top/project/任务名`（GitLab 插件的路径规则不同，见下）
+   - URL：`http://49.234.202.181:18080/project/任务名`（GitLab 插件路径规则不同，见下方表格）
    - Trigger：`Push events`、`Merge request events`
+4. 保存后点 **Redeliver / Test**，返回 200 且 Jenkins 立刻出现构建即成功。
 
-> **注意安全**：穿透地址等于把你的 Jenkins 暴露给互联网。演示完立刻关掉，且不要用弱密码。
+> **快速演示的备选**：完全不想碰服务器时，用 cpolar / ngrok 临时暴露一节演示即可，但**别写进团队配置**——域名会变。
+>
+> **注意安全**：18080 一开，等于把 Jenkins 挂到公网。管理员密码必须强，教学环境不要放真实生产凭据；演示完 `sudo systemctl stop frps` 或删掉安全组规则即恢复本地。
 
 #### 路线 B：轮询（最省事，延迟可接受）
 
@@ -241,11 +374,11 @@ triggers {
 }
 ```
 
-延迟平均 2.5 分钟，对学习和小团队完全够用。**本书实操默认用这条**，避免为了 Webhook 去折腾穿透。
+延迟平均 2.5 分钟，对学习和小团队完全够用。**配好路线 A 之后可以保留它做兜底**：Webhook 偶发丢失（GitHub 重投失败、穿透断过）时，轮询还能补上。
 
 #### 路线 C：把 Jenkins 放到有公网的服务器（企业最终形态）
 
-给 Jenkins 单独一台有公网 IP 的机器（或内网机器 + 反代），这才是生产做法。第 17 章会讲"CI 机到底应该放哪"。
+路线 A 是"Jenkins 留在本机、只把入口暴露出去"；这条路是把 **Jenkins 本身**部署在有公网 IP 的机器上（或内网机器 + 反代），不需要任何穿透，这是生产做法。第 17 章会讲"CI 机到底应该放哪"。
 
 **GitHub 与 GitLab 的 URL 差别（易错点）**：
 
@@ -277,7 +410,7 @@ shared-library/
 
 ```groovy
 def call(Map cfg = [:]) {
-    def registry  = cfg.registry  ?: 'ccr.ccs.tencentyun.com'
+    def registry  = cfg.registry  ?: 'ghcr.io'
     def namespace = cfg.namespace ?: 'default'
     def name      = cfg.name      ?: error('缺少 name 参数')
     def tag       = cfg.tag       ?: "${env.BUILD_NUMBER}"
@@ -292,7 +425,7 @@ def call(Map cfg = [:]) {
     }
 
     withCredentials([usernamePassword(
-        credentialsId: cfg.registryCredentialId ?: 'tcr-registry',
+        credentialsId: cfg.registryCredentialId ?: 'ghcr-registry',
         usernameVariable: 'REG_USER',
         passwordVariable: 'REG_PASS'
     )]) {
@@ -437,13 +570,17 @@ git push -u origin feature/jenkins-test
 | 现象 | 根因 | 解法 |
 | --- | --- | --- |
 | Webhook 显示 404 | URL 少了结尾斜杠，或路径不对 | GitHub 用 `/github-webhook/`；看 Jenkins 系统日志 |
-| Webhook 显示超时/连不上 | Jenkins 在内网，公网够不着 | 用穿透、或改轮询、或把 Jenkins 放公网机 |
+| Webhook 显示超时/连不上 | Jenkins 在内网，公网够不着 | 用 frp 自建穿透（路线 A）、或改轮询、或把 Jenkins 放公网机 |
+| frpc 报 `dial tcp ...:7000: i/o timeout` | 云安全组/防火墙没放行 7000，或公司网络拦非标端口出站 | 先放行 TCP 7000；仍不通就把两端控制端口都改成 443 |
+| `tar: Unexpected EOF in archive` / `gzip: stdin: unexpected end of file` | 压缩包下载不完整（中断后重名、镜像限速被截断） | 解压前先 `gzip -t` 校验；残缺包删掉重下，GitHub 慢就加 `https://ghfast.top/` 前缀 |
+| `Cannot mkdir: Permission denied` | 在 `/opt` 等目录普通用户无写权限 | 命令前加 `sudo`，或先在家目录操作再 `sudo mv` |
+| 重启电脑后 Webhook 又失效 | frpc 没设开机自启 | 任务计划程序 `schtasks /sc onstart`，或用 nssm 注册服务 |
 | Multibranch 扫不到分支 | 仓库凭据无读权限，或过滤规则排除 | 检查凭据；看 Scan 日志 |
 | Jenkinsfile 改了不生效 | 任务用的是"界面脚本"而非 SCM | 任务配置里改成 Pipeline script from SCM |
 | `@Library` 报 `No such library` | 名字拼错 / 版本不对 / 路径配错 | 核对 Global Pipeline Libraries 的 Name 与 Library Path |
 | 共享库函数报 `MissingPropertyException` | `vars/` 文件名与函数名不一致 | `vars/buildImage.groovy` 里必须是 `def call(...)` |
 | 凭据日志变明文 | 用了 `echo` + 字符串拼接/编码 | 改用 `withCredentials` 原生绑定，别二次加工 |
-| `docker: command not found` | Jenkins 容器里没装 Docker CLI | 第 10 章会做专用镜像 |
+| `docker: command not found` | Jenkins 容器里没装 Docker CLI | 给 Jenkins 容器挂载宿主 Docker（`/var/run/docker.sock`）并装 CLI，或改用能跑 docker 的 Agent |
 | 部署时 `Permission denied (publickey)` | 私钥与服务器 `authorized_keys` 不匹配 | 用同一个私钥在本地先验证 `ssh -i` |
 
 ---
@@ -471,6 +608,7 @@ git push -u origin feature/jenkins-test
 - [ ] 建了 Multibranch 任务，新推分支 5 分钟内自动出现
 - [ ] `Jenkinsfile` 在仓库里，改它能让流水线行为变化
 - [ ] 配了轮询或 Webhook，提交后自动触发
+- [ ] 内网穿透用的是固定地址（frp 自建），重启电脑后 Webhook 依然可用
 - [ ] 知道共享库的 `vars/`、`src/`、`resources/` 分别放什么
 
 ### 练习

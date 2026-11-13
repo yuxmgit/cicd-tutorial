@@ -81,7 +81,7 @@ Manage Jenkins → Security：
 | 凭据 ID | 类型 | 用途 | 权限范围 |
 | --- | --- | --- | --- |
 | `deploy-ssh-key` | SSH Username with private key | 部署到生产机 | 生产机 `ubuntu` 用户，**仅限执行 `/opt/apps/cicd-demo/scripts/` 下的脚本** |
-| `tcr-registry` | Username with password | 拉推镜像仓库 | TCR 只读或读写 |
+| `ghcr-registry` | Username with password | 拉推镜像仓库 | GitHub PAT，仅 packages 读写 |
 | `git-webhook-token` | Secret text | Webhook 校验 | 仅触发构建 |
 
 **让 SSH 凭据"只许跑脚本"**（生产机上，给部署动作上笼子）：
@@ -108,7 +108,7 @@ esac
 **轮换与清理**：
 
 - 每季度过一遍凭据列表：没 Job 引用的、对应人员已离职的，直接删。
-- 凭据 ID 命名带用途与年份：`tcr-registry-2026`，轮换时新建再切换，出问题可秒回退。
+- 凭据 ID 命名带用途与年份：`ghcr-registry-2026`，轮换时新建再切换，出问题可秒回退。
 
 ### 步骤 3 Agent 与执行隔离
 

@@ -8,13 +8,13 @@
  * 返回：完整镜像地址
  */
 def call(Map cfg = [:]) {
-    def registry   = cfg.registry   ?: 'ccr.ccs.tencentyun.com'
+    def registry   = cfg.registry   ?: 'ghcr.io'
     def namespace  = cfg.namespace  ?: 'default'
     def name       = cfg.name       ?: error('buildImage: 缺少 name 参数')
     def tag        = cfg.tag        ?: "${env.BUILD_NUMBER}"
     def dockerfile = cfg.dockerfile ?: 'Dockerfile'
     def context    = cfg.context    ?: '.'
-    def credId     = cfg.registryCredentialId ?: 'tcr-registry'
+    def credId     = cfg.registryCredentialId ?: 'ghcr-registry'
 
     def image = "${registry}/${namespace}/${name}:${tag}"
     echo "准备构建镜像：${image}"

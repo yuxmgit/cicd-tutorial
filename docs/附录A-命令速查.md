@@ -23,7 +23,7 @@ docker images | head                       # 本地镜像
 docker build -f deploy/Dockerfile.backend -t cicd-demo-backend:42 demos/backend
 docker save cicd-demo-backend:42 | gzip > b.tar.gz
 gunzip -c b.tar.gz | docker load           # 无仓库路径导入
-docker pull ccr.ccs.tencentyun.com/cicd-demo/cicd-demo-backend:42
+docker pull ghcr.io/yxm1989614/cicd-demo-backend:42
 
 docker compose -f docker-compose.yml --env-file .env up -d --remove-orphans
 docker compose ps
@@ -82,7 +82,7 @@ git revert HEAD                            # 撤销上次提交（实验后恢�
 ```bash
 # 【服务器】
 sudo TAG=<tag> bash /opt/apps/cicd-demo/scripts/deploy-local.sh   # 无仓库路径
-sudo REGISTRY=... REGISTRY_NAMESPACE=... bash scripts/deploy.sh <tag>   # 仓库路径
+sudo REGISTRY=ghcr.io REGISTRY_NAMESPACE=yxm1989614 bash scripts/deploy.sh <tag>   # 仓库路径
 sudo bash scripts/rollback.sh --list
 sudo bash scripts/rollback.sh              # 回到上一版
 readlink -f /opt/apps/cicd-demo/current    # 当前版本目录
