@@ -89,7 +89,7 @@ flowchart TB
 | --- | --- | --- |
 | 前端 | `dist/` 打成的 tar.gz | 服务器 `releases/` 目录 / 对象存储 |
 | Java | `app.jar` | Nexus / 服务器 `releases/` |
-| 任意语言 | Docker 镜像 | 镜像仓库（TCR / SWR / Docker Hub） |
+| 任意语言 | Docker 镜像 | 镜像仓库（GHCR / SWR / Docker Hub） |
 | 附带的 | 测试报告、覆盖率报告、SBOM | 流水线归档区 |
 
 **"不可变"是什么意思？** 一旦发布，`app-v1.2.3-20261111.tar.gz` 这个文件名就再也不能被别的构建覆盖。想改？出个新版本号。

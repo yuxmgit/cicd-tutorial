@@ -349,7 +349,7 @@ docker volume inspect jenkins-home
 | 页面一直"Jenkins 正在启动" | 内存不足或插件初始化慢 | `docker stats jenkins` 看内存；给 Docker 加到 4G+；首次启动等 2~3 分钟 |
 | `initialAdminPassword` 文件不存在 | 容器还没初始化完 | 等日志出现 `Please use the following password`；或 `docker logs jenkins` 里直接找 |
 | 插件安装全部失败 | 网络访问不了 update center | 换清华镜像；或在 Docker Desktop 里配代理 |
-| 构建卡在 `sh` 步骤 | 容器里缺命令（如 `docker`、`node`） | 基础镜像只有 Java + 少量工具；第 10 章会做专用镜像 |
+| 构建卡在 `sh` 步骤 | 容器里缺命令（如 `docker`、`node`） | 基础镜像只有 Java + 少量工具；给 Jenkins 容器挂载宿主 Docker（`/var/run/docker.sock`）并装 CLI，或改用能跑 docker 的 Agent |
 | 日志时间差 8 小时 | 时区没生效 | 检查 `TZ` 与 `-Duser.timezone`；重启容器 |
 | 重启 Docker Desktop 后 Jenkins 配置没了 | 用了 `down -v` 或没挂卷 | 只能重新配置，然后学会备份（步骤 7） |
 | Windows 上 `sh` 步骤报 CRLF 错误 | 脚本是 CRLF | 仓库根有 `.gitattributes`；Jenkinsfile 里避免直接写多行 shell |

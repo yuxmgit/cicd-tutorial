@@ -2,7 +2,7 @@
 # 生产发布脚本：拉镜像 → 建版本目录 → 切软链 → 起容器 → 健康检查 → 失败自动回滚 → 清理旧版本
 #
 # 用法（在服务器上）：
-#   sudo REGISTRY=ccr.ccs.tencentyun.com REGISTRY_NAMESPACE=cicd-demo \
+#   sudo REGISTRY=ghcr.io REGISTRY_NAMESPACE=yxm1989614 \
 #        bash scripts/deploy.sh 42-a1b2c3d
 #
 # 环境变量：

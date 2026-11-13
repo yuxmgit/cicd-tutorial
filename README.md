@@ -27,7 +27,7 @@ CI/CD 就是给软件团队装上这套中央厨房流水线。
 | 已装软件 | git、curl、wget、python 3.14、make、ufw；**Docker 与 Nginx 未安装** | 第 11 章负责安装，并配国内镜像加速 |
 | 端口 | **80/443 全部空闲**，仅 22 在监听 | 可直接用标准端口 + HTTPS，不必绕 8443 |
 | 域名 | 无 | HTTPS 走自签 CA 主线 + sslip.io 进阶 |
-| 镜像仓库 | 腾讯云 TCR（个人版）/ Docker Hub | 与服务器同地域可走内网拉取，省带宽 |
+| 镜像仓库 | GitHub GHCR / Docker Hub | 公开镜像免费，服务器公网拉取 |
 | 对照案例 | 另一台华为云 `huawei-yun`：宝塔面板 + 邮件服务 + FTP，`available` 仅 **14Mi**，80/443/888/8888 全被占用 | **被否决的部署机**，作为"怎么选一台合格的生产机"反面案例写进第 11 章 |
 
 ## 三、学习路线
@@ -54,7 +54,7 @@ CI/CD 就是给软件团队装上这套中央厨房流水线。
 | 07 | [前端流水线实战](docs/07-前端流水线实战.md) | npm ci、缓存、lint、测试、体积门禁 | ★★☆ | ✅ 完成 |
 | 08 | [后端流水线实战](docs/08-后端流水线实战.md) | pip 缓存、pytest、SQLite 路径、优雅退出 | ★★☆ | ✅ 完成 |
 | 09 | [质量与安全门禁](docs/09-质量与安全门禁.md) | 覆盖率卡点、漏洞扫描、husky 前置门禁 | ★★☆ | ✅ 完成 |
-| 10 | [镜像与制品管理](docs/10-镜像与制品管理.md) | 多阶段 Dockerfile、Tag 策略、TCR 内网拉取 | ★★★ | ✅ 完成 |
+| 10 | [镜像与制品管理](docs/10-镜像与制品管理.md) | 多阶段 Dockerfile、Tag 策略、GHCR 推拉镜像 | ★★★ | ✅ 完成 |
 | 11 | [服务器初始化](docs/11-服务器初始化.md) | 先探测后动手：用户/SSH/安全组/Swap/Docker/Nginx | ★★☆ | ✅ 完成 |
 | 12 | [部署方式演进](docs/12-部署方式演进.md) | scp → systemd → Compose → 蓝绿 → 秒级回滚 | ★★★ | ✅ 完成 |
 | 13 | [Nginx 与 HTTPS](docs/13-Nginx与HTTPS.md) | 反代、缓存、自签 CA、sslip.io 真证书 | ★★★ | ✅ 完成 |
@@ -68,6 +68,7 @@ CI/CD 就是给软件团队装上这套中央厨房流水线。
 | 附A | [命令速查](docs/附录A-命令速查.md) | 全书命令按场景归档 | — | ✅ 完成 |
 | 附B | [配置模板大全](docs/附录B-配置模板大全.md) | 所有配置文件一键取用 | — | ✅ 完成 |
 | 附C | [面试高频题](docs/附录C-面试高频题.md) | 40 题 + 答题要点 | — | ✅ 完成 |
+| 附D | [端到端部署 Runbook](docs/附录D-端到端部署Runbook.md) | Jenkins/GitHub/Git 全流程实操 + 验证场景 | — | ✅ 完成 |
 
 ## 五、目录结构
 
@@ -77,7 +78,7 @@ cicd-tutorial/
 ├── GLOSSARY.md          术语表（全书统一口径）
 ├── .gitattributes       强制 LF，防 Windows CRLF 事故
 ├── .env.example         环境变量样例（无明文密钥）
-├── docs/                21 章正文 + 3 个附录 + 探测记录
+├── docs/                21 章正文 + 4 个附录 + 探测记录
 ├── demos/               Vue3+Vite 前端 / FastAPI+SQLite 后端
 ├── pipelines/           jenkins（主线）+ github + gitlab（对照）
 ├── deploy/              compose / nginx / systemd / Dockerfile

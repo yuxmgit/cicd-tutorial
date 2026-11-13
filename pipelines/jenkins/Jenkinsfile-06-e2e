@@ -82,9 +82,9 @@ pipeline {
                         sh "ssh ${DEPLOY_SSH} 'TAG=${IMAGE_TAG} LOCAL_DEPLOY=1 bash -s' < scripts/deploy-local.sh"
                     } else {
                         // 有仓库路径：推送后服务器拉取
-                        sh "docker tag cicd-demo-backend:${IMAGE_TAG}  ccr.ccs.tencentyun.com/cicd-demo/cicd-demo-backend:${IMAGE_TAG}"
-                        sh "docker tag cicd-demo-frontend:${IMAGE_TAG} ccr.ccs.tencentyun.com/cicd-demo/cicd-demo-frontend:${IMAGE_TAG}"
-                        sh "ssh ${DEPLOY_SSH} 'sudo REGISTRY=ccr.ccs.tencentyun.com REGISTRY_NAMESPACE=cicd-demo bash /opt/apps/cicd-demo/scripts/deploy.sh ${IMAGE_TAG}'"
+                        sh "docker tag cicd-demo-backend:${IMAGE_TAG}  ghcr.io/yxm1989614/cicd-demo-backend:${IMAGE_TAG}"
+                        sh "docker tag cicd-demo-frontend:${IMAGE_TAG} ghcr.io/yxm1989614/cicd-demo-frontend:${IMAGE_TAG}"
+                        sh "ssh ${DEPLOY_SSH} 'sudo REGISTRY=ghcr.io REGISTRY_NAMESPACE=yxm1989614 bash /opt/apps/cicd-demo/scripts/deploy.sh ${IMAGE_TAG}'"
                     }
                 }
             }

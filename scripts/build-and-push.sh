@@ -8,14 +8,14 @@
 # 必填环境变量：
 #   REGISTRY_NAMESPACE   镜像仓库命名空间
 # 可选：
-#   REGISTRY             默认 ccr.ccs.tencentyun.com
+#   REGISTRY             默认 ghcr.io
 #   MAX_SIZE_MB          体积上限，默认 250
 #   PUSH=1               构建完成后推送（需要已 docker login）
 set -euo pipefail
 
 APP="${1:?用法: build-and-push.sh <frontend|backend> <tag>}"
 TAG="${2:?缺少 tag，建议用 BUILD_NUMBER 或 git sha}"
-REGISTRY="${REGISTRY:-ccr.ccs.tencentyun.com}"
+REGISTRY="${REGISTRY:-ghcr.io}"
 NAMESPACE="${REGISTRY_NAMESPACE:?请设置 REGISTRY_NAMESPACE}"
 MAX_SIZE_MB="${MAX_SIZE_MB:-250}"
 
