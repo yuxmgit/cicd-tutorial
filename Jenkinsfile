@@ -27,14 +27,18 @@ pipeline {
             agent {
                 docker {
                     image 'python:3.11-slim'
-                    args '-v jenkins-pip-cache:/root/.cache/pip'
+                    args '-v jenkins-pip-cache:/tmp/pip-cache -e PIP_CACHE_DIR=/tmp/pip-cache'
                     reuseNode true
                 }
             }
             steps {
                 dir('demos/backend') {
-                    sh 'pip install -r requirements.txt'
-                    sh 'pytest'
+                    // 用工作区 venv 而不是 pip --user：容器内 HOME 不可写时会报 /.local 权限错误
+                    sh '''
+                        python -m venv .venv
+                        .venv/bin/pip install -r requirements.txt
+                        .venv/bin/pytest
+                    '''
                 }
             }
         }
