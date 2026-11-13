@@ -34,10 +34,11 @@ pipeline {
             steps {
                 dir('demos/backend') {
                     // 用工作区 venv 而不是 pip --user：容器内 HOME 不可写时会报 /.local 权限错误
+                    // 用 python -m pytest 而不是直接调 pytest：后者不会把当前目录加进 sys.path，会报 No module named 'app'
                     sh '''
                         python -m venv .venv
                         .venv/bin/pip install -r requirements.txt
-                        .venv/bin/pytest
+                        .venv/bin/python -m pytest
                     '''
                 }
             }
