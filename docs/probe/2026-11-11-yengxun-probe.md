@@ -1,7 +1,7 @@
-# 生产机只读探测记录（yengxun-yun）
+# 生产机只读探测记录（tengxunyun）
 
 - 时间：2026-11-11 14:17 CST
-- 目标：腾讯云 CVM，SSH 别名 `yengxun-yun`，公网 `49.234.202.181`，用户 `ubuntu`
+- 目标：腾讯云 CVM，SSH 别名 `tengxunyun`，公网 `49.234.202.181`，用户 `ubuntu`
 - 方式：`scripts/probe-server.sh`，只读，未做任何修改
 - 用途：第 11 章的"动手前先看清家底"原始素材
 
