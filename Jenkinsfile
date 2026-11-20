@@ -56,8 +56,8 @@ pipeline {
                 sh '''
                     docker rm -f smoke-api 2>/dev/null || true
                     docker run -d --name smoke-api -p 18000:8000 "$IMAGE_BACKEND"
-                    // 注意：sh 在 Jenkins 容器内执行，127.0.0.1 指容器自身，
-                    // 访问 docker run -p 发布的端口必须走默认网桥的网关 172.17.0.1
+                    # 注意：sh 在 Jenkins 容器内执行，127.0.0.1 指容器自身，
+                    # 访问 docker run -p 发布的端口必须走默认网桥的网关 172.17.0.1
                     for i in $(seq 1 20); do
                         if curl -fsS http://172.17.0.1:18000/healthz >/dev/null; then
                             echo "冒烟测试通过（第 ${i} 次）"; exit 0
