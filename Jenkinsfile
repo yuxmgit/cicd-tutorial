@@ -27,12 +27,17 @@ pipeline {
             agent {
                 docker {
                     image 'python:3.11-slim'
+ fix/pip-venv
                     args '-v jenkins-pip-cache:/tmp/pip-cache -e PIP_CACHE_DIR=/tmp/pip-cache'
+
+                    args '-v jenkins-pip-cache:/root/.cache/pip'
+ main
                     reuseNode true
                 }
             }
             steps {
                 dir('demos/backend') {
+fix/pip-venv
                     // 用工作区 venv 而不是 pip --user：容器内 HOME 不可写时会报 /.local 权限错误
                     // 用 python -m pytest 而不是直接调 pytest：后者不会把当前目录加进 sys.path，会报 No module named 'app'
                     sh '''
@@ -40,6 +45,10 @@ pipeline {
                         .venv/bin/pip install -r requirements.txt
                         .venv/bin/python -m pytest
                     '''
+
+                    sh 'pip install -r requirements.txt'
+                    sh 'pytest'
+main
                 }
             }
         }
