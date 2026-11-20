@@ -4,7 +4,11 @@
 # 数据在命名卷 jenkins-home 里，down 不会丢；只有 down -v 才会删（危险）
 services:
   jenkins:
-    image: jenkins/jenkins:lts-jdk17
+    # 第 15 章起改用带工具的自定义镜像（Dockerfile.jenkins），首次启动要 --build
+    build:
+      context: .
+      dockerfile: Dockerfile.jenkins
+    image: cicd-jenkins:lts-jdk17
     container_name: jenkins
     restart: unless-stopped
     # 用 root 跑是为了避开 Windows 卷权限问题；企业环境应指定 uid:gid
@@ -22,6 +26,11 @@ services:
         -Dhudson.model.DownloadService.noSignatureCheck=true
     volumes:
       - jenkins-home:/var/jenkins_home
+      # 流水线构建镜像：复用宿主 Docker 守护进程
+      - /var/run/docker.sock:/var/run/docker.sock
+      # 宿主机 SSH 密钥挂到 /host-ssh（只读），启动后复制进 /var/jenkins_home/.ssh 并改权限，
+      # 命令见第 15 章步骤 6。Mac/Linux 把 USERPROFILE 行换成 ~/.ssh:/host-ssh:ro
+      - ${USERPROFILE}/.ssh:/host-ssh:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/login >/dev/null || exit 1"]
       interval: 30s

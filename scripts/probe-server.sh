@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # 服务器只读探测：只读取信息，不安装、不修改、不重启任何东西
 # 用法：
-#   scp scripts/probe-server.sh yengxun-yun:/tmp/probe.sh
-#   ssh yengxun-yun 'bash /tmp/probe.sh'
+#   scp scripts/probe-server.sh tengxunyun:/tmp/probe.sh
+#   ssh tengxunyun 'bash /tmp/probe.sh'
 set -uo pipefail
 
 echo "==================== 1. 系统 ===================="

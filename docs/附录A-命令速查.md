@@ -1,15 +1,15 @@
 # 附录 A 命令速查
 
-> 全书高频命令按场景归档，可直接复制。`【本地】`= Windows 开发机，`【服务器】`= yengxun-yun，`【容器】`= 容器内。
+> 全书高频命令按场景归档，可直接复制。`【本地】`= Windows 开发机，`【服务器】`= tengxunyun，`【容器】`= 容器内。
 
 ## SSH 与文件传输
 
 ```powershell
 # 【本地】免密连接 / 执行单命令 / 传文件
-ssh yengxun-yun
-ssh yengxun-yun "uname -r"
-scp .\scripts\deploy.sh yengxun-yun:/tmp/
-scp -r .\demos\frontend\dist yengxun-yun:/tmp/
+ssh tengxunyun
+ssh tengxunyun "uname -r"
+scp .\scripts\deploy.sh tengxunyun:/tmp/
+scp -r .\demos\frontend\dist tengxunyun:/tmp/
 
 # 【本地】批量推送公钥（首次配置，需输一次密码）
 type $env:USERPROFILE\.ssh\id_ed25519.pub | ssh ubuntu@49.234.202.181 "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"

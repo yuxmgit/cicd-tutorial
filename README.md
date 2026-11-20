@@ -2,7 +2,7 @@
 
 > 一套"**文档教程为主线 + 可运行 Demo 为辅助 + 真实服务器跑通为终点**"的 CI/CD 学习体系。
 > 主推平台：**Jenkins**（GitHub Actions / GitLab CI 全程横向对照）。
-> 部署形态：**单机实战**（Docker + Docker Compose + Nginx + HTTPS），部署目标是一台真实的腾讯云 CVM（`yengxun-yun`，Ubuntu 26.04 实测）。
+> 部署形态：**单机实战**（Docker + Docker Compose + Nginx + HTTPS），部署目标是一台真实的腾讯云 CVM（`tengxunyun`，Ubuntu 26.04 实测）。
 > 仓库：`git@github.com:yuxmgit/cicd-tutorial.git`（分支保护建议见第 02 章，Webhook 配置见第 05 章）。
 
 ## 一、为什么学这个？
@@ -21,7 +21,7 @@ CI/CD 就是给软件团队装上这套中央厨房流水线。
 | 项 | 值 | 影响 |
 | --- | --- | --- |
 | CI 机（本地） | Windows + Docker Desktop，跑 Jenkins | CI 与生产分离；第 17 章专讲 Windows 宿主的坑（CRLF、路径、卷挂载） |
-| 生产机（远端） | 腾讯云 CVM `yengxun-yun`，`49.234.202.181`，用户 `ubuntu`（sudo 免密） | 非 root 用户，脚本全程用 `sudo`，第 11 章讲"为什么不给 root" |
+| 生产机（远端） | 腾讯云 CVM `tengxunyun`，`49.234.202.181`，用户 `ubuntu`（sudo 免密） | 非 root 用户，脚本全程用 `sudo`，第 11 章讲"为什么不给 root" |
 | 系统 | **Ubuntu 26.04 LTS**，内核 7.0，x86_64 | 全部命令按 26.04 实测，apt 系 |
 | 规格 | **4 vCPU / 3.6 GiB 内存**（available 2.9 GiB），39 GiB 盘（剩 32 GiB），已有 2 GiB Swap | 够跑 Docker + 前后端 + Nginx；Jenkins 仍不上生产机 |
 | 已装软件 | git、curl、wget、python 3.14、make、ufw；**Docker 与 Nginx 未安装** | 第 11 章负责安装，并配国内镜像加速 |
@@ -69,6 +69,9 @@ CI/CD 就是给软件团队装上这套中央厨房流水线。
 | 附B | [配置模板大全](docs/附录B-配置模板大全.md) | 所有配置文件一键取用 | — | ✅ 完成 |
 | 附C | [面试高频题](docs/附录C-面试高频题.md) | 40 题 + 答题要点 | — | ✅ 完成 |
 | 附D | [端到端部署 Runbook](docs/附录D-端到端部署Runbook.md) | Jenkins/GitHub/Git 全流程实操 + 验证场景 | — | ✅ 完成 |
+fix/pip-venv
+| 附E | [Jenkins 凭据详解](docs/附录E-Jenkins凭据详解.md) | 4 条凭据的原理/创建/使用/排错逐一讲透 | — | ✅ 完成 |
+ main
 
 ## 五、目录结构
 

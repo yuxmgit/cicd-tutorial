@@ -16,7 +16,7 @@ pipeline {
     }
 
     environment {
-        DEPLOY_SSH   = 'yengxun-yun'                     // 本地 ~/.ssh/config 里的别名
+        DEPLOY_SSH   = 'tengxunyun'                     // 本地 ~/.ssh/config 里的别名
         APP_BASE_DIR = '/opt/apps/cicd-demo'
         GIT_SHA      = sh(returnStdout: true, script: 'git rev-parse --short=7 HEAD').trim()
         IMAGE_TAG    = "${env.BUILD_NUMBER}-${env.GIT_SHA}"

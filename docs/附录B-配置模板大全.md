@@ -105,7 +105,7 @@ pipeline {
         stage('门禁')   { steps { sh 'bash scripts/security-scan.sh deps' } }
         stage('镜像')   { steps { sh "docker build -f deploy/Dockerfile.backend -t cicd-demo-backend:${env.IMAGE_TAG} demos/backend" } }
         stage('审批')   { when { branch 'main' }; steps { input message: '发布到生产？', submitter: 'release-approvers' } }
-        stage('部署')   { steps { sh "ssh yengxun-yun 'TAG=${env.IMAGE_TAG} bash -s' < scripts/deploy-local.sh" } }
+        stage('部署')   { steps { sh "ssh tengxunyun 'TAG=${env.IMAGE_TAG} bash -s' < scripts/deploy-local.sh" } }
     }
     post { failure { echo "失败：${env.BUILD_URL}console" } cleanup { cleanWs() } }
 }

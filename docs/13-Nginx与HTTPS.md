@@ -129,7 +129,7 @@ X509v3 Subject Alternative Name:
 
 ```powershell
 # 【本地】把 ca.crt 拉到本地
-scp yengxun-yun:/opt/apps/cicd-demo/shared/certs/ca.crt .
+scp tengxunyun:/opt/apps/cicd-demo/shared/certs/ca.crt .
 
 # 打开"管理计算机证书"：Win+R → certlm.msc
 # 受信任的根证书颁发机构 → 证书 → 右键"所有任务" → 导入 → 选择 ca.crt
@@ -327,8 +327,8 @@ cd /opt/apps/cicd-demo/shared/certs
 sudo bash /opt/apps/cicd-demo/scripts/gen-selfsigned-cert.sh 49.234.202.181
 
 # 2. 上传 site.conf（本地执行）
-#    scp deploy/nginx/site.conf yengxun-yun:/tmp/site.conf
-#    ssh yengxun-yun "sudo mv /tmp/site.conf /opt/apps/cicd-demo/shared/nginx/site.conf"
+#    scp deploy/nginx/site.conf tengxunyun:/tmp/site.conf
+#    ssh tengxunyun "sudo mv /tmp/site.conf /opt/apps/cicd-demo/shared/nginx/site.conf"
 
 # 3. 重启 web 容器
 cd /opt/apps/cicd-demo/current
