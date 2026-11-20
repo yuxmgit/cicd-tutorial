@@ -69,9 +69,7 @@ CI/CD 就是给软件团队装上这套中央厨房流水线。
 | 附B | [配置模板大全](docs/附录B-配置模板大全.md) | 所有配置文件一键取用 | — | ✅ 完成 |
 | 附C | [面试高频题](docs/附录C-面试高频题.md) | 40 题 + 答题要点 | — | ✅ 完成 |
 | 附D | [端到端部署 Runbook](docs/附录D-端到端部署Runbook.md) | Jenkins/GitHub/Git 全流程实操 + 验证场景 | — | ✅ 完成 |
-fix/pip-venv
 | 附E | [Jenkins 凭据详解](docs/附录E-Jenkins凭据详解.md) | 4 条凭据的原理/创建/使用/排错逐一讲透 | — | ✅ 完成 |
- main
 
 ## 五、目录结构
 
