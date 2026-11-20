@@ -10,7 +10,7 @@ pipeline {
 
     environment {
         REGISTRY      = 'ghcr.io'
-        NAMESPACE     = 'cicd-demo'                    // ← 换成你的 GitHub 用户名（GHCR 命名空间）
+        NAMESPACE     = 'yxm1989614'                   // GHCR 命名空间 = 凭据 ghcr-registry 的 GitHub 用户名
         APP_TAG       = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
         IMAGE_BACKEND = "${REGISTRY}/${NAMESPACE}/cicd-demo-backend:${APP_TAG}"
         IMAGE_FRONTEND= "${REGISTRY}/${NAMESPACE}/cicd-demo-frontend:${APP_TAG}"
